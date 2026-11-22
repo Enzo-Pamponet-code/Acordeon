@@ -3,7 +3,7 @@ from rich.console import Console
 from rich import print
 from rich.panel import Panel
 import sqlite3
-
+from datetime import date, datetime
 
 def status(prompt:str, time:int):
     console = Console()
@@ -52,7 +52,7 @@ def banco_(prompt, parametro = None):
             curso.execute(prompt)
         else:
             curso.execute(prompt, parametro)
-    return curso
+        return curso
 
 def ninput(prompt):
     while True:
@@ -66,11 +66,9 @@ def buscar(nome,prompt, table):
     WHERE {prompt} LIKE ?''', (f'{nome}',))
     return dado
 
-
 def tabular(prompt, value = 15):
     space = ' '*(value - len(prompt))
     return prompt+space
-
 
 def super_string(lista):
     string = ''
@@ -81,23 +79,52 @@ def super_string(lista):
         string += f'{substr}\n'
     return string
 
-
 def all_to_list(fetchall, lista):
     for c in fetchall:
         lista.append(c)
 
 def list_to_panel(c1, c2, fetchall):
     lista = [(c1, c2)]
-    all_to_list(fetchall.fetchall(), lista)
+    all_to_list(fetchall, lista)
     string = super_string(lista)
     painel = Panel(string, expand=False)
     print(painel)
     return len(lista)
 
+def validador(nome, filtro, tabela):
+    busca = buscar(nome,filtro, tabela)
+    lista = busca.fetchall()
+    if len(lista) >0:
+        return False
+    else:
+        return True
+
+def delete(c1, c2 ,tabela):
+    busca = buscar(c1, c2, tabela)
+    lista = busca.fetchall()
+    if len(lista) == 1:
+        atualizar = banco_(f'''DELETE FROM {tabela} WHERE ?''', (f'%{c1}%',))
+        return atualizar
+    else:
+        return None
+
+def rinput(prompt):
+    while True:
+        try:
+            numero = int(input(prompt))
+            return numero
+        except ValueError:
+            print('[red]Valor invalido. Tente Novamente[/]')
+
 class Gatilhos:
     @staticmethod
     def salvar():
-        nome = ninput('O nome do gatilho: ')
+        while True:
+            nome = ninput('O nome do gatilho: ')
+            if validador(nome, 'nome', 'gatilhos'):
+                print('[red]Tente novamente, nome já inserido.')
+            else:
+                break
         solucao = input('Digite a solução do problema: ')
         banco_('''INSERT INTO gatilhos
             (nome, solucao)
@@ -109,8 +136,10 @@ class Gatilhos:
         interface = banco_('''SELECT nome FROM gatilhos''')
         list_to_panel('[blue]Nome[/]', '', interface)
         while True:
-            busca_ = buscar(ninput('O nome que você quer buscar: '),'nome','gatilhos')
-            tam = list_to_panel('nome', 'solução', busca_)
+            nome = ninput('O nome que você quer buscar: ')
+            busca_ = buscar(nome,'nome','gatilhos')
+            lista = busca_.fetchall()
+            tam = list_to_panel('nome', 'solução', lista)
             if tam > 2:
                 try:
                     pergunta = input('deseja continuar: ').strip().upper()[0]
@@ -120,5 +149,26 @@ class Gatilhos:
                     print('Fim de Busca.')
                     break
             else:
+                string = '''[yellow]1. Você deseja continuar?[/]
+[blue]2. Você deseja atualizar?[/]
+[red bold]3. Você deseja deletar?[/]'''
+                painel = Panel(string)
+                print(painel)
+                escolha = rinput('Escolha um desses valores: ')
+                match escolha:
+                    case 1:
+                        pass
+                    case 2:
+                        banco_('''UPDATE gatilhos SET solucao = ?
+                        WHERE nome = ?''', (input('Digite uma nova solução: '), lista[0][0]))
+                    case 3:
+                        delete(nome, 'nome', 'gatilhos')
                 input('Aperte ENTER: ')
                 break
+
+class Diario:
+    @staticmethod
+    def escrever():
+        data = datetime.today().date()
+        fstring = f'{data:%d/%m/%Y}'
+        buscar()
