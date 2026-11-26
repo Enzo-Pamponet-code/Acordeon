@@ -2,6 +2,8 @@ from funcoes import *
 
 
 
+def main():
+    system()
 
-public_interface()
-Diario().escrever()
+if __name__ == '__main__':
+    main()

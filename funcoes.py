@@ -3,7 +3,7 @@ from rich.console import Console
 from rich import print
 from rich.panel import Panel
 import sqlite3
-from datetime import date, datetime
+from datetime import datetime
 
 def status(prompt:str, time:int):
     console = Console()
@@ -116,12 +116,22 @@ def rinput(prompt):
         except ValueError:
             print('[red]Valor invalido. Tente Novamente[/]')
 
+def cinput(prompt):
+    while True:
+        try:
+            calendar = input(prompt)
+            datetime.strptime(calendar, '%d/%m/%Y')
+            return calendar
+        except ValueError:
+            print('[red bold]Tente novamente,tente escrever dia/mês/ano[/]')
+
+
 class Gatilhos:
     @staticmethod
     def salvar():
         while True:
             nome = ninput('O nome do gatilho: ')
-            if validador(nome, 'nome', 'gatilhos'):
+            if not validador(nome, 'nome', 'gatilhos'):
                 print('[red]Tente novamente, nome já inserido.')
             else:
                 break
@@ -162,7 +172,8 @@ class Gatilhos:
                         banco_('''UPDATE gatilhos SET solucao = ?
                         WHERE nome = ?''', (input('Digite uma nova solução: '), lista[0][0]))
                     case 3:
-                        delete(nome, 'nome', 'gatilhos')
+                        print(lista[0][0])
+                        banco_('''DELETE FROM gatilhos WHERE nome LIKE ?''', (f'%{lista[0][0]}%',))
                 input('Aperte ENTER: ')
                 break
 
@@ -171,4 +182,116 @@ class Diario:
     def escrever():
         data = datetime.today().date()
         fstring = f'{data:%d/%m/%Y}'
-        buscar()
+        cursor = buscar(fstring, 'data', 'diario').fetchall()
+        if len(cursor) > 0:
+            lista = cursor
+            string = lista[0][1]
+            str_a_in = string + input('O que você quer escrever a mais em seu diário?: ')
+            banco_('''UPDATE diario SET texto = ?
+            WHERE data = ?''', (str_a_in, fstring))
+        else:
+            banco_(f'''INSERT INTO diario
+            (data, texto)
+            VALUES
+            (?, ?)''', (fstring,input('O que você quer escrever em seu diário?: ')))
+            print(fstring)
+    @staticmethod
+    def ler():
+        data = cinput('Digite a data para você ler o que você escreveu no dia: ')
+        lista = banco_('''SELECT texto FROM diario 
+        WHERE data LIKE ?''', (data,)).fetchall()
+        painel = Panel(lista[0][0], expand=False, title=data)
+        print(painel)
+        input('Aperte ENTER: ')
+
+
+class Ofensiva:
+    @staticmethod
+    def quebra():
+        data = datetime.today().date()
+        fstring = f'{data:%d/%m/%Y}'
+        banco_('''INSERT INTO ofensiva
+        (nome, data)
+        VALUES
+        (?,?)''', ('quebra de ofensiva', fstring))
+    @staticmethod
+    def inicio():
+        data = datetime.today().date()
+        fstring = f'{data:%d/%m/%Y}'
+        if len(buscar('inicio', 'nome', 'ofensiva').fetchall()) == 0:
+            banco_('''INSERT INTO ofensiva
+            (nome, data)
+            VALUES
+            (?,?)''', ('inicio', fstring))
+        else:
+            print('[red bold]Não pode escrever um novo inicio![/]')
+    @staticmethod
+    def dias():
+        dataf = buscar('inicio', 'nome', 'ofensiva').fetchall()[0][1]
+        split = dataf.split('/')
+        data = datetime.fromisoformat(f'{split[2]}-{split[1]}-{split[0]}')
+        delta = datetime.today().date() - data.date()
+        lista = banco_('''SELECT * FROM ofensiva''').fetchall()
+        print(f'[blue]Temos {str(delta).split()[0]} dias da sua longa caminhada para fugir do vício.[/]')
+        try:
+            dataf = buscar('quebra de ofensiva', 'nome', 'ofensiva').fetchall()[-1][1]
+            split = dataf.split('/')
+            data = datetime.fromisoformat(f'{split[2]}-{split[1]}-{split[0]}')
+            delta = datetime.today().date() - data.date()
+            print(f'[purple]Você tem {str(delta).split()[0]} dias desde da sua ultima quebra de ofensiva.[/]')
+        except IndexError:
+            dataf = str(delta).split()[0]
+            print(f'[purple]Você tem {dataf} dias desde da sua ultima quebra de ofensiva.[/]')
+        input('Aperte ENTER: ')
+
+def limitador(prompt, min= 1, max =3):
+    while True:
+        try:
+            dados = int(input(prompt))
+            if min <= dados <= max:
+                return dados
+            else:
+                print('Dados fora do limite')
+                pass
+        except ValueError:
+            print('Valor incorreto')
+            continue
+
+
+def system():
+    create()
+    while True:
+        public_interface()
+        pergunta = limitador('Escolha um entre as opções: ')
+        print('\n'*50)
+        if pergunta == 1:
+            painel = Panel('''1. Salvar
+2. Buscar''')
+            print(painel)
+            pergunta = limitador('Escolha um entre as opções: ', max=2)
+            if pergunta == 1:
+                Gatilhos().salvar()
+            else:
+                Gatilhos().busca()
+        elif pergunta == 2:
+            painel = Panel('''1. inicio
+2. Quebra de ofensiva
+3. Dias de ofensiva''')
+            print(painel)
+            pergunta = limitador('Escolha um entre as opções: ')
+            if pergunta == 1:
+                Ofensiva().inicio()
+            elif pergunta == 2:
+                Ofensiva().quebra()
+            else:
+                Ofensiva().dias()
+        else:
+            painel = Panel('''1. Escrever
+2. Ler''')
+            print(painel)
+            pergunta = limitador('Escolha um entre as opções: ', max=2)
+            if pergunta == 1:
+                Diario().escrever()
+            else:
+                Diario().ler()
+        print('\n' * 50)
